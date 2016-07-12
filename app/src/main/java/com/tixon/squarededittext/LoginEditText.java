@@ -28,16 +28,6 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         this.typingFinishedListener = listener;
     }
 
-    private boolean shouldReplaceLastSquare = false;
-
-    public boolean shouldReplaceLastSquare() {
-        return shouldReplaceLastSquare;
-    }
-
-    public void setShouldReplaceLastSquare(boolean shouldReplaceLastSquare) {
-        this.shouldReplaceLastSquare = shouldReplaceLastSquare;
-    }
-
     private static final int SQUARE_QUANTITY_DEFAULT = 8;
 
     //Size in dp from design
@@ -76,7 +66,11 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     Paint squareCursorPaint = new Paint();
 
     private String text = "";
+    private String penultimateDigit = "";
+
     private boolean needCursorAtTheEnd = false;
+    private boolean shouldReplaceLastSquare = false;
+    private boolean needLastDigitHighlighted = false;
 
     CredentialsTextWatcher textWatcher;
 
@@ -192,28 +186,20 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     }
 
     private void drawCursor(Canvas canvas, int position) {
-        //todo
+        float xStart;
         if(needLastDigitHighlighted) {
             if (text.length() > 0 && text.length() < 8) {
-                float xStart = (position-1) * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-                float xEnd = xStart + squareWidth - Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-                float yTop = Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-                float yBottom = squareWidth;
-                canvas.drawRect(xStart, yTop, xEnd, yBottom, squareCursorPaint);
+                xStart = (position - 1) * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
             } else {
-                float xStart = position * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-                float xEnd = xStart + squareWidth - Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-                float yTop = Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-                float yBottom = squareWidth;
-                canvas.drawRect(xStart, yTop, xEnd, yBottom, squareCursorPaint);
+                xStart = position * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
             }
         } else {
-            float xStart = position * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-            float xEnd = xStart + squareWidth - Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-            float yTop = Utils.dpToPx(STROKE_MARGIN_DP, getContext());
-            float yBottom = squareWidth;
-            canvas.drawRect(xStart, yTop, xEnd, yBottom, squareCursorPaint);
+            xStart = position * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
         }
+        float xEnd = xStart + squareWidth - Utils.dpToPx(STROKE_MARGIN_DP, getContext());
+        float yTop = Utils.dpToPx(STROKE_MARGIN_DP, getContext());
+        float yBottom = squareWidth;
+        canvas.drawRect(xStart, yTop, xEnd, yBottom, squareCursorPaint);
     }
 
     public void drawCursorAtTheEnd() {
@@ -235,9 +221,6 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
 
     // Override methods
 
-    private String penultimateDigit = "";
-
-
     @Override
     protected void dispatchSetActivated(boolean activated) {
         super.dispatchSetActivated(activated);
@@ -245,10 +228,13 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
             if(text.length() == 8) {
                 requestFocus();
                 drawCursorAtTheEnd();
-                //todo
+
                 needLastDigitHighlighted = true;
                 removeTextChangedListener(textWatcher);
                 //save penultimate digit of text to use it in deleting
+                penultimateDigit = String.valueOf(text.charAt(text.length() - 2));
+                shouldReplaceLastSquare = true;
+
                 setText(text.substring(0, text.length() - 1));
                 addTextChangedListener(textWatcher);
             }
@@ -267,8 +253,6 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         Log.d("myLogs", getText().toString());
     }
 
-    boolean needLastDigitHighlighted = false;
-
     /**
      * TextWatcher for notifying of entering text
      */
@@ -282,11 +266,6 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
             if(before == 0 && count == 1) {
                 if(needLastDigitHighlighted) {
                     StringBuilder sb = new StringBuilder(s);
-                    if(s.length() == 8) {
-
-                    } else {
-                        sb.replace(sb.length() - 2, sb.length(), sb.substring(sb.length() - 1));
-                    }
                     //to replace digit in highlighted square
                     text = sb.toString();
                     setText(text);
@@ -305,12 +284,23 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
             if(before == 1 && count == 0) {
                 text = String.valueOf(s);
                 if(shouldReplaceLastSquare) {
-                    text += penultimateDigit;
-                    shouldReplaceLastSquare = false;
+                    Log.d("myLogs", "s = " + s + "; text + penultimate = " + (text+penultimateDigit) + "; text + penultimate length: " + (text+penultimateDigit).length() + "; penultimate = " + penultimateDigit);
+                    if((text + penultimateDigit).length() > 1) {
+                        removeTextChangedListener(textWatcher);
+                        text += penultimateDigit;
+                        penultimateDigit = String.valueOf(text.charAt(text.length() - 2));
+                        addTextChangedListener(textWatcher);
+                    } else if((text + penultimateDigit).length() == 1) {
+                        removeTextChangedListener(textWatcher);
+                        text = penultimateDigit;
+                        setText(text);
+                        penultimateDigit = "";
+                        addTextChangedListener(textWatcher);
+                    }
                 }
 
-                if(text.length() == 0) {
-                    //todo
+                if((text + penultimateDigit).length() == 0) {
+                    Log.d("myLogs", "clear selection");
                     needLastDigitHighlighted = false;
                 }
                 invalidate();
