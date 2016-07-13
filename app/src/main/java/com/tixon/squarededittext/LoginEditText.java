@@ -62,7 +62,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         this.typingFinishedListener = listener;
     }
 
-    private static final int SQUARE_QUANTITY_DEFAULT = 8;
+    private static final int CELLS_NUMBER_DEFAULT = 8;
 
     //Size in dp from design
     private static final int TEXT_SIZE = 14;
@@ -81,11 +81,10 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     /**
      * cellsNumber is read from custom attributes from LoginEditText
      * default value is 8
-     * custom value is used in res/layout/activity_login_second_layer.xml
      */
-    private int userIdLength = 8;
-    private int cellsNumber = 8;
-    private int intervalQuantity = 7;
+    private int maxTextLength = CELLS_NUMBER_DEFAULT;
+    private int cellsNumber = CELLS_NUMBER_DEFAULT;
+    private int intervalQuantity = CELLS_NUMBER_DEFAULT - 1;
 
     private float squareWithInterval;
     private float squareWidth;
@@ -95,9 +94,9 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     private float textSize;
     private float squareIntervalPart;
 
-    Paint paint = new Paint();
+    Paint backgroundPaint = new Paint();
     Paint textPaint = new Paint();
-    Paint squareCursorPaint = new Paint();
+    Paint cursorPaint = new Paint();
 
     private String text = "";
     private String penultimateDigit = "";
@@ -126,16 +125,48 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     }
 
     /**
+     * Checks that EditText is empty
+     * @return true if empty, false otherwise
+     */
+    private boolean isEmpty() {
+        return text.isEmpty();
+    }
+
+    /**
+     * Checks that EditText has any text
+     * @return true if has text, false otherwise
+     */
+    private boolean hasText() {
+        return text.length() > 0;
+    }
+
+    /**
+     * Checks that EditText is not filled
+     * @return true if not filled, false otherwise
+     */
+    private boolean isNotFull() {
+        return text.length() < maxTextLength;
+    }
+
+    /**
+     * Checks that EditText is filled with symbols
+     * @return true if filled, false otherwise
+     */
+    private boolean isFull() {
+        return text.length() == maxTextLength;
+    }
+
+    /**
      * Read custom attributes values
-     * custom attribute is cellsNumber that defines number of squares
+     * custom attribute is cellsNumber that defines number of cells
      * in background of EditText
      */
     private void readAttrs(Context context, AttributeSet attrs) {
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.LoginEditText, 0, 0);
         try {
             cellsNumber = ta.getInt(R.styleable.LoginEditText_cellsNumber,
-                    SQUARE_QUANTITY_DEFAULT);
-            userIdLength = cellsNumber;
+                    CELLS_NUMBER_DEFAULT);
+            maxTextLength = cellsNumber;
             intervalQuantity = cellsNumber - 1;
         } finally {
             ta.recycle();
@@ -150,6 +181,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     public void setCellsNumber(int number) {
         if(number > 0) {
             this.cellsNumber = number;
+            this.maxTextLength = number;
             this.intervalQuantity = number - 1;
         }
     }
@@ -163,23 +195,23 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         disableEnterPress();
         disableActionDone();
 
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setAntiAlias(true);
+        backgroundPaint.setStyle(Paint.Style.STROKE);
+        backgroundPaint.setAntiAlias(true);
 
         textPaint.setColor(getResources().getColor(R.color.white));
         textPaint.setAntiAlias(true);
 
-        squareCursorPaint.setStyle(Paint.Style.STROKE);
-        squareCursorPaint.setColor(getResources().getColor(R.color.white));
-        squareCursorPaint.setStrokeWidth(Utils.dpToPx(STROKE_WIDTH_CURSOR_DP, getContext()));
-        squareCursorPaint.setAntiAlias(true);
+        cursorPaint.setStyle(Paint.Style.STROKE);
+        cursorPaint.setColor(getResources().getColor(R.color.white));
+        cursorPaint.setStrokeWidth(Utils.dpToPx(STROKE_WIDTH_CURSOR_DP, getContext()));
+        cursorPaint.setAntiAlias(true);
 
         invalidate();
     }
 
     private void drawBackground(Canvas canvas) {
-        paint.setColor(getResources().getColor(R.color.white));
-        paint.setStrokeWidth(Utils.dpToPx(STROKE_WIDTH_SQUARE_DP, getContext()));
+        backgroundPaint.setColor(getResources().getColor(R.color.white));
+        backgroundPaint.setStrokeWidth(Utils.dpToPx(STROKE_WIDTH_SQUARE_DP, getContext()));
         calculateSizes();
         textPaint.setTextSize(textSize);
         drawSquares(canvas);
@@ -206,26 +238,26 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         float xFrom = Utils.dpToPx(STROKE_WIDTH_SQUARE_DP, getContext());
         float one = xFrom;
         float xTo;
-        for(int i = 0; i < userIdLength; i++) {
+        for(int i = 0; i < maxTextLength; i++) {
             xTo = xFrom + squareWidth;
-            canvas.drawRect(xFrom, one, xTo, one+squareWidth, paint);
+            canvas.drawRect(xFrom, one, xTo, one+squareWidth, backgroundPaint);
             xFrom = xTo + squareInterval;
         }
     }
 
     private void drawText(Canvas canvas) {
-        if(text.length() >= 1) {
+        if(hasText()) {
             canvas.drawText(text, 0, 1, textMargin, textHeight, textPaint);
             for (int i = 1; i < text.length(); i++) {
                 canvas.drawText(text, i, i + 1, textMargin + i*(squareWithInterval + squareIntervalPart), textHeight, textPaint);
             }
-            if(text.length() < userIdLength) {
+            if(isNotFull()) {
                 drawCursor(canvas, text.length());
-            } else if(text.length() == userIdLength && needCursorAtTheEnd) {
+            } else if(isFull() && needCursorAtTheEnd) {
                 drawCursor(canvas, text.length() - 1);
             }
         }
-        else if(text.isEmpty()) {
+        else if(isEmpty()) {
             drawCursor(canvas, text.length());
         }
     }
@@ -233,7 +265,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     private void drawCursor(Canvas canvas, int position) {
         float xStart;
         if(modeReplaceDigitInCursorWhenTyping) {
-            if (text.length() > 0 && text.length() < 8) {
+            if (hasText() && isNotFull()) {
                 xStart = (position - 1) * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
             } else {
                 xStart = position * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
@@ -244,7 +276,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         float xEnd = xStart + squareWidth - Utils.dpToPx(STROKE_MARGIN_DP, getContext());
         float yTop = Utils.dpToPx(STROKE_MARGIN_DP, getContext());
         float yBottom = squareWidth;
-        canvas.drawRect(xStart, yTop, xEnd, yBottom, squareCursorPaint);
+        canvas.drawRect(xStart, yTop, xEnd, yBottom, cursorPaint);
     }
 
     public void drawCursorAtTheEnd() {
@@ -270,7 +302,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     protected void dispatchSetActivated(boolean activated) {
         super.dispatchSetActivated(activated);
         if(activated) {
-            if(text.length() == 8) {
+            if(isFull()) {
                 requestFocus();
                 drawCursorAtTheEnd();
 
@@ -295,7 +327,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         clearCursorAtTheEnd();
         clearFocus();
         setActivated(false);
-        Log.d("myLogs", getText().toString());
+        Log.d("myLogs", "Typing finished, text = " + getText().toString());
     }
 
     /**
@@ -324,7 +356,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
                     text = String.valueOf(s);
                     invalidate();
                 }
-                if(text.length() == 8) {
+                if(isFull()) {
                     typingFinishedListener.onTypingFinished();
                 }
             }
@@ -333,7 +365,11 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
             if(before == 1 && count == 0) {
                 text = String.valueOf(s);
                 if(shouldMoveCursorOnLastDigitWhenDeleting) {
-                    Log.d("myLogs", "s = " + s + "; text + penultimate = " + (text+penultimateDigit) + "; text + penultimate length: " + (text+penultimateDigit).length() + "; penultimate = " + penultimateDigit);
+                    /*Log.d("myLogs", "s = " + s + "; text + penultimate = " +
+                            (text+penultimateDigit) + "; text + penultimate length: " +
+                            (text+penultimateDigit).length() + "; penultimate = " +
+                            penultimateDigit);*/
+
                     if((text + penultimateDigit).length() > 1) {
                         removeTextChangedListener(textWatcher);
                         text += penultimateDigit;
