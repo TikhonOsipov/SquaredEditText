@@ -24,6 +24,10 @@ import android.widget.TextView;
  *
  * This EditText has custom behavior and background. It consists of several cells and a cursor
  * which are drawn on the background in the onDraw method.
+ * Number of cells is 8 by default, but this number can be changed in custom attribute
+ * @see #readAttrs(Context, AttributeSet)
+ * or by calling a method
+ * @see #setCellsNumber(int)
  *
  * The initial state of EditText: text is empty, cursor is at the first position.
  * When user starts to type any symbol, it is placing into cell selected with a cursor, and
@@ -75,12 +79,12 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     public static final float STROKE_WIDTH_CURSOR_DP = 3.0f;
 
     /**
-     * squareQuantity is read from custom attributes from LoginEditText
+     * cellsNumber is read from custom attributes from LoginEditText
      * default value is 8
      * custom value is used in res/layout/activity_login_second_layer.xml
      */
     private int userIdLength = 8;
-    private int squareQuantity = 8;
+    private int cellsNumber = 8;
     private int intervalQuantity = 7;
 
     private float squareWithInterval;
@@ -123,19 +127,30 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
 
     /**
      * Read custom attributes values
-     * custom attribute is squareQuantity that defines number of squares
+     * custom attribute is cellsNumber that defines number of squares
      * in background of EditText
      */
     private void readAttrs(Context context, AttributeSet attrs) {
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.LoginEditText, 0, 0);
         try {
-            squareQuantity = ta.getInt(R.styleable.LoginEditText_squareQuantity,
+            cellsNumber = ta.getInt(R.styleable.LoginEditText_cellsNumber,
                     SQUARE_QUANTITY_DEFAULT);
-            //Log.d("myLogs", "squareQuantity = " + squareQuantity);
-            userIdLength = squareQuantity;
-            intervalQuantity = squareQuantity - 1;
+            userIdLength = cellsNumber;
+            intervalQuantity = cellsNumber - 1;
         } finally {
             ta.recycle();
+        }
+    }
+
+    /**
+     * Set number of cells programmatically
+     * @param number number of cells
+     */
+    @SuppressWarnings("unused")
+    public void setCellsNumber(int number) {
+        if(number > 0) {
+            this.cellsNumber = number;
+            this.intervalQuantity = number - 1;
         }
     }
 
@@ -174,7 +189,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
      * Calculate sizes for background
      */
     private void calculateSizes() {
-        squareWithInterval = (float) getWidth() / (float) squareQuantity;
+        squareWithInterval = (float) getWidth() / (float) cellsNumber;
         squareIntervalPart = (squareWithInterval * INTERVAL_PERCENTAGE) / intervalQuantity / 2.0f;
         // \/2.0f here because without it last square is of out of borders
         squareInterval = squareWithInterval * INTERVAL_PERCENTAGE + squareIntervalPart;
