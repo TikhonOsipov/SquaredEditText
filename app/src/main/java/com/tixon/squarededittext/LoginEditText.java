@@ -19,6 +19,36 @@ import android.widget.TextView;
 
 /**
  * Created by tikhon.osipov on 08.07.2016
+ *
+ * @author tikhon.osipov
+ *
+ * This EditText has custom behavior and background. It consists of several cells and a cursor
+ * which are drawn on the background in the onDraw method.
+ *
+ * The initial state of EditText: text is empty, cursor is at the first position.
+ * When user starts to type any symbol, it is placing into cell selected with a cursor, and
+ * cursor is moving to the next cell. When the last cell is selected with cursor and empty,
+ * and user types any symbol, it is placing into this cell, and cursor disappears;
+ * @see #onTypingFinished() is running which tells that user has filled all the cells.
+ * @see TypingFinishedListener
+ *
+ * This EditText dispatches its activation in method when somewhere is called method
+ * "editText.activate()"
+ * EditText can become activated only if all the cells are filled with symbols.
+ * @see #dispatchSetActivated(boolean)
+ *
+ * When user activates EditText, the last cell becomes selected with a cursor using
+ * @see #needCursorAtTheEnd,
+ * and boolean flags
+ * @see #modeReplaceDigitInCursorWhenTyping
+ * @see #shouldMoveCursorOnLastDigitWhenDeleting
+ * become true. So behavior of EditText changes. While there are any symbols in EditText
+ * cells, when user types any symbol, symbol in selected cell by cursor is replaced by
+ * symbol which was typed by user. Boolean flags become false and previous behavior returns.
+ * Also when user deletes symbols, cursor selects the last symbol in EditText. Flags don't change
+ * their state.
+ * When user deletes all symbols in EditText, flags become false and EditText takes the initial
+ * state.
  */
 public class LoginEditText extends EditText implements TypingFinishedListener {
 
@@ -69,8 +99,8 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
     private String penultimateDigit = "";
 
     private boolean needCursorAtTheEnd = false;
-    private boolean shouldReplaceLastSquare = false;
-    private boolean needLastDigitHighlighted = false;
+    private boolean shouldMoveCursorOnLastDigitWhenDeleting = false;
+    private boolean modeReplaceDigitInCursorWhenTyping = false;
 
     CredentialsTextWatcher textWatcher;
 
@@ -187,7 +217,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
 
     private void drawCursor(Canvas canvas, int position) {
         float xStart;
-        if(needLastDigitHighlighted) {
+        if(modeReplaceDigitInCursorWhenTyping) {
             if (text.length() > 0 && text.length() < 8) {
                 xStart = (position - 1) * (squareWithInterval + squareIntervalPart) + Utils.dpToPx(STROKE_MARGIN_DP, getContext());
             } else {
@@ -229,11 +259,11 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
                 requestFocus();
                 drawCursorAtTheEnd();
 
-                needLastDigitHighlighted = true;
+                modeReplaceDigitInCursorWhenTyping = true;
                 removeTextChangedListener(textWatcher);
                 //save penultimate digit of text to use it in deleting
                 penultimateDigit = String.valueOf(text.charAt(text.length() - 2));
-                shouldReplaceLastSquare = true;
+                shouldMoveCursorOnLastDigitWhenDeleting = true;
 
                 setText(text.substring(0, text.length() - 1));
                 addTextChangedListener(textWatcher);
@@ -264,13 +294,17 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         public void onTextChanged(CharSequence s, int start, int before, int count) {
             //typing
             if(before == 0 && count == 1) {
-                if(needLastDigitHighlighted) {
+                if(modeReplaceDigitInCursorWhenTyping) {
                     StringBuilder sb = new StringBuilder(s);
                     //to replace digit in highlighted square
+                    if(text.length() == 1) {
+                        sb.replace(0, sb.length(), sb.substring(1, sb.length()));
+                    }
                     text = sb.toString();
                     setText(text);
                     invalidate();
-                    needLastDigitHighlighted = false;
+                    modeReplaceDigitInCursorWhenTyping = false;
+                    shouldMoveCursorOnLastDigitWhenDeleting = false;
                 } else {
                     text = String.valueOf(s);
                     invalidate();
@@ -283,7 +317,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
             //deleting
             if(before == 1 && count == 0) {
                 text = String.valueOf(s);
-                if(shouldReplaceLastSquare) {
+                if(shouldMoveCursorOnLastDigitWhenDeleting) {
                     Log.d("myLogs", "s = " + s + "; text + penultimate = " + (text+penultimateDigit) + "; text + penultimate length: " + (text+penultimateDigit).length() + "; penultimate = " + penultimateDigit);
                     if((text + penultimateDigit).length() > 1) {
                         removeTextChangedListener(textWatcher);
@@ -301,7 +335,8 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
 
                 if((text + penultimateDigit).length() == 0) {
                     Log.d("myLogs", "clear selection");
-                    needLastDigitHighlighted = false;
+                    modeReplaceDigitInCursorWhenTyping = false;
+                    shouldMoveCursorOnLastDigitWhenDeleting = false;
                 }
                 invalidate();
             }
