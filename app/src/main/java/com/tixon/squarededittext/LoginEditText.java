@@ -310,6 +310,7 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
                 removeTextChangedListener(textWatcher);
                 //save penultimate digit of text to use it in deleting
                 penultimateDigit = String.valueOf(text.charAt(text.length() - 2));
+                Log.d("myLogs", "penultimateDigit (dispatchSetActivated) : " + penultimateDigit);
                 shouldMoveCursorOnLastDigitWhenDeleting = true;
 
                 setText(text.substring(0, text.length() - 1));
@@ -330,10 +331,13 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         Log.d("myLogs", "Typing finished, text = " + getText().toString());
     }
 
+    boolean modeDelete = false;
+
     /**
      * TextWatcher for notifying of entering text
      */
     class CredentialsTextWatcher implements TextWatcher {
+        String savedText = "";
         @Override
         public void beforeTextChanged(CharSequence s, int start, int count, int after) {
         }
@@ -341,11 +345,20 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
         public void onTextChanged(CharSequence s, int start, int before, int count) {
             //typing
             if(before == 0 && count == 1) {
+                if(shouldMoveCursorOnLastDigitWhenDeleting) {
+                    modeDelete = false;
+                }
                 if(modeReplaceDigitInCursorWhenTyping) {
                     StringBuilder sb = new StringBuilder(s);
                     //to replace digit in highlighted square
                     if(text.length() == 1) {
                         sb.replace(0, sb.length(), sb.substring(1, sb.length()));
+                    } else {
+                        if(modeDelete) {
+                            sb.replace(sb.length() - 2, sb.length() - 1, sb.substring(sb.length() - 1));
+                            sb.deleteCharAt(sb.length() - 1);
+                            modeDelete = false;
+                        }
                     }
                     text = sb.toString();
                     setText(text);
@@ -359,21 +372,30 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
                 if(isFull()) {
                     typingFinishedListener.onTypingFinished();
                 }
+                savedText = text;
+                modeDelete = false;
             }
 
             //deleting
             if(before == 1 && count == 0) {
+                if(!modeDelete && isNotFull()) {
+                    Log.d("myLogs", "s = " + String.valueOf(s) + ", text = " + text + ", savedText = " + savedText);
+                    text = savedText;
+                    setText(savedText);
+                    setSelection(savedText.length());
+                    modeDelete = true;
+                    modeReplaceDigitInCursorWhenTyping = true;
+                    return;
+                }
                 text = String.valueOf(s);
                 if(shouldMoveCursorOnLastDigitWhenDeleting) {
-                    /*Log.d("myLogs", "s = " + s + "; text + penultimate = " +
-                            (text+penultimateDigit) + "; text + penultimate length: " +
-                            (text+penultimateDigit).length() + "; penultimate = " +
-                            penultimateDigit);*/
+                    modeDelete = true;
 
                     if((text + penultimateDigit).length() > 1) {
                         removeTextChangedListener(textWatcher);
                         text += penultimateDigit;
                         penultimateDigit = String.valueOf(text.charAt(text.length() - 2));
+                        Log.d("myLogs", "penultimateDigit (onDelete) : " + penultimateDigit);
                         addTextChangedListener(textWatcher);
                     } else if((text + penultimateDigit).length() == 1) {
                         removeTextChangedListener(textWatcher);
@@ -388,6 +410,10 @@ public class LoginEditText extends EditText implements TypingFinishedListener {
                     Log.d("myLogs", "clear selection");
                     modeReplaceDigitInCursorWhenTyping = false;
                     shouldMoveCursorOnLastDigitWhenDeleting = false;
+                }
+
+                if(isEmpty()) {
+                    modeDelete = false;
                 }
                 invalidate();
             }
